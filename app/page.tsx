@@ -12,14 +12,14 @@ export default function Landing() {
     <PhoneShell>
       <div className="landing">
         <div className="landing-hero">
-          <div className="ornament">𝓘</div>
+          <div className="ornament">𝓹𝓳</div>
           <h1>
             <em>Quiet pages</em>, kept just for you.
           </h1>
           <p className="tagline">
-            A journaling &amp; daily-tasks app where everything is private by default.
-            Open it from any device, sign in with your phone &amp; secret word, and the
-            page is yours alone.
+            A journaling &amp; daily-tasks app where everything is private by
+            default. Open it from any device, sign in with your phone &amp;
+            secret word, and the page is yours alone.
           </p>
         </div>
 
@@ -47,12 +47,16 @@ export default function Landing() {
           <div className="feature-tile">
             <div className="ico">𝓉</div>
             <h4>Auto sign-out</h4>
-            <p>20 minutes idle and the session ends — even on a bookmarked URL.</p>
+            <p>
+              20 minutes idle and the session ends — even on a bookmarked URL.
+            </p>
           </div>
           <div className="feature-tile">
             <div className="ico">𝓅</div>
             <h4>Beautiful PDF export</h4>
-            <p>Typeset journals, drop caps, ornaments. Yours to keep, forever.</p>
+            <p>
+              Typeset journals, drop caps, ornaments. Yours to keep, forever.
+            </p>
           </div>
         </div>
 

@@ -39,13 +39,13 @@ export default function Settings() {
               alignItems: "center",
               justifyContent: "center",
               fontFamily: "Instrument Serif, serif",
-              fontSize: 30,
+              fontSize: 24,
               color: "#fff",
               fontStyle: "italic",
               boxShadow: "var(--shadow-card)",
             }}
           >
-            𝓘
+            𝓹𝓳
           </div>
           <h3
             style={{
@@ -180,7 +180,9 @@ export default function Settings() {
               cursor: "pointer",
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--accent)" }}>
+            <span
+              style={{ fontSize: 13, fontWeight: 500, color: "var(--accent)" }}
+            >
               Sign out now
             </span>
             <span
