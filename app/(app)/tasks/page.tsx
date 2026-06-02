@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TopNav from "@/components/TopNav";
 
 type Task = { id: string; title: string; done: boolean };
@@ -9,6 +9,9 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/tasks")
@@ -46,6 +49,26 @@ export default function Tasks() {
   const remove = async (t: Task) => {
     setTasks((prev) => prev.filter((x) => x.id !== t.id));
     await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
+  };
+
+  const startEdit = (t: Task) => {
+    setEditingId(t.id);
+    setEditTitle(t.title);
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  const saveEdit = async (t: Task) => {
+    const trimmed = editTitle.trim();
+    setEditingId(null);
+    if (!trimmed || trimmed === t.title) return;
+    setTasks((prev) =>
+      prev.map((x) => (x.id === t.id ? { ...x, title: trimmed } : x))
+    );
+    await fetch(`/api/tasks/${t.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmed }),
+    });
   };
 
   const remaining = tasks.filter((t) => !t.done).length;
@@ -141,20 +164,52 @@ export default function Tasks() {
               >
                 {t.done && "✓"}
               </div>
-              <div
-                onClick={() => toggle(t)}
-                style={{
-                  fontSize: 14,
-                  textDecoration: t.done ? "line-through" : "none",
-                  color: t.done ? "var(--muted)" : "var(--ink)",
-                  flex: 1,
-                  cursor: "pointer",
-                }}
-              >
-                {t.title}
-              </div>
+              {editingId === t.id ? (
+                <input
+                  ref={editInputRef}
+                  className="input"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={() => saveEdit(t)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit(t);
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  style={{ flex: 1, fontSize: 14, padding: "4px 8px" }}
+                />
+              ) : (
+                <div
+                  onClick={() => startEdit(t)}
+                  style={{
+                    fontSize: 14,
+                    textDecoration: t.done ? "line-through" : "none",
+                    color: t.done ? "var(--muted)" : "var(--ink)",
+                    flex: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.title}
+                </div>
+              )}
+              {editingId !== t.id && (
+                <button
+                  onClick={() => startEdit(t)}
+                  title="Edit task"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--muted-2)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    lineHeight: 1,
+                  }}
+                >
+                  ✏
+                </button>
+              )}
               <button
                 onClick={() => remove(t)}
+                title="Delete task"
                 style={{
                   background: "none",
                   border: "none",
