@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { PINNED_SORT_OFFSET, PENDING_SORT_OFFSET } from "@/lib/task-constants";
 
@@ -25,7 +25,7 @@ export default function Tasks() {
   const dragId = useRef<string | null>(null);
   const dragOverId = useRef<string | null>(null);
 
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     const res = await fetch("/api/tasks");
     const data = await res.json();
     if (!res.ok) {
@@ -34,12 +34,12 @@ export default function Tasks() {
     }
     setTasks(data.tasks || []);
     setError(null);
-  };
+  }, []);
 
   useEffect(() => {
     loadTasks()
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadTasks]);
 
   const add = async () => {
     if (!newTitle.trim()) return;
