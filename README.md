@@ -6,6 +6,15 @@ A privacy-first journaling and daily-tasks web app, built with Next.js 15
 > Two-factor sign-in (phone + secret word). 20-minute idle timeout.
 > Per-entry visibility. Bookmark-resistant auth wall.
 
+## Features
+
+- **Journal** — Create, edit, and browse entries. Autosave with debounce (700 ms). Per-entry visibility (`private` / `shared link` / `public`).
+- **Daily tasks** — Add, complete, delete, rename, **pin**, and **drag-to-reorder** tasks. Pinned tasks float to the top with a gold indicator.
+- **Dashboard** — Live session countdown, recent entries, today's tasks preview (pinned first), and a running word-count stat.
+- **Session guard** — Idle warning modal at 60 s, automatic sign-out + redirect to `/signin?reason=idle`. Server-side session refreshed every minute while the user is active.
+- **Auth** — Phone + secret-word two-factor sign-in, Argon2id hashing, JWT session cookie, account recovery hash stored for future self-service reset.
+- **Export** — Browser print-to-PDF available now; full typeset PDF export planned for v1.1.
+
 ![Landing page](public/screenshots/screenshot-landing.jpg)
 
 ## Quick start
@@ -78,8 +87,8 @@ That's it. Free for hobby projects, never sleeps, scales globally.
 │       │   ├── route.ts        ← GET list / POST create
 │       │   └── [id]/route.ts   ← GET / PUT / DELETE
 │       └── tasks/
-│           ├── route.ts        ← GET list / POST create
-│           └── [id]/route.ts   ← PUT / DELETE
+│           ├── route.ts        ← GET list / POST create / PATCH bulk-reorder
+│           └── [id]/route.ts   ← PUT (done · title · pinned) / DELETE
 ├── components/
 │   ├── PhoneShell.tsx          ← phone-frame chrome
 │   ├── SessionGuard.tsx        ← idle-timer + warning modal + auto sign-out
@@ -88,7 +97,9 @@ That's it. Free for hobby projects, never sleeps, scales globally.
 │   ├── db.ts                   ← Neon serverless client
 │   ├── auth.ts                 ← Argon2id, JWT, cookies, getCurrentAccount
 │   ├── ratelimit.ts            ← in-memory token bucket per IP
-│   └── api.ts                  ← JSON response helpers
+│   ├── api.ts                  ← JSON response helpers
+│   ├── task-constants.ts       ← sort-order offsets for pinned / pending groups
+│   └── tasks-schema.ts         ← lazy migration: adds pinned & sort_order columns
 ├── middleware.ts               ← the auth wall — bounces unauth requests
 ├── scripts/
 │   ├── schema.sql              ← canonical DB schema
@@ -129,9 +140,11 @@ Before going live with real users:
 
 See [`scripts/schema.sql`](scripts/schema.sql). Three tables:
 
-- `accounts` — `phone_hash`, `secret_hash` (argon2id), timestamps
+- `accounts` — `phone_hash`, `secret_hash` (argon2id), `recovery_hash`, timestamps
 - `entries` — journal entries (title + body in v1, ciphertext columns ready for v2)
-- `tasks` — daily tasks
+- `tasks` — daily tasks with `pinned` (boolean) and `sort_order` (integer) for drag-to-reorder
+
+The `tasks` table ships with migration guards (`ADD COLUMN IF NOT EXISTS`) so an existing database upgrades automatically on first use without a manual migration step.
 
 For full end-to-end encryption (operator can't read entries), populate the
 `title_ciphertext` / `body_ciphertext` / `nonce` / `wrapped_entry_key` columns
@@ -145,7 +158,8 @@ npm run dev      # next dev — hot-reload on http://localhost:3000
 npm run build    # next build — production bundle
 npm run start    # next start — runs the production bundle locally
 npm run lint     # eslint
-npm run db:setup # creates tables in DATABASE_URL
+npm run db:setup # creates/migrates tables in DATABASE_URL
+npm run db:reset # drops and recreates all tables (destructive — dev only)
 ```
 
 ## License
