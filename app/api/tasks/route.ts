@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import { getCurrentAccount, refreshSession } from "@/lib/auth";
 import { ok, err } from "@/lib/api";
 import { PINNED_SORT_OFFSET, PENDING_SORT_OFFSET } from "@/lib/task-constants";
+import { ensureTasksSchema } from "@/lib/tasks-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ type Task = {
 export async function GET() {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
+  await ensureTasksSchema();
 
   const rows = (await sql`
     SELECT id, title, done, pinned, sort_order, created_at
@@ -34,6 +36,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
+  await ensureTasksSchema();
 
   let body: { title?: string };
   try {
@@ -59,6 +62,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
+  await ensureTasksSchema();
 
   let body: { ids?: string[]; pinned?: boolean };
   try {

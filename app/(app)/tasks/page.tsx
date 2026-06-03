@@ -16,6 +16,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -24,10 +25,19 @@ export default function Tasks() {
   const dragId = useRef<string | null>(null);
   const dragOverId = useRef<string | null>(null);
 
+  const loadTasks = async () => {
+    const res = await fetch("/api/tasks");
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Could not load tasks.");
+      return;
+    }
+    setTasks(data.tasks || []);
+    setError(null);
+  };
+
   useEffect(() => {
-    fetch("/api/tasks")
-      .then((r) => r.json())
-      .then((data) => setTasks(data.tasks || []))
+    loadTasks()
       .finally(() => setLoading(false));
   }, []);
 
@@ -38,39 +48,68 @@ export default function Tasks() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: newTitle }),
     });
+    const data = await res.json();
     if (res.ok) {
-      const data = await res.json();
       setTasks((prev) => [data.task, ...prev]);
       setNewTitle("");
+      setError(null);
+    } else {
+      setError(data.error || "Could not add task.");
     }
   };
 
   const toggle = async (t: Task) => {
+    const previous = tasks;
     setTasks((prev) =>
       prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x))
     );
-    await fetch(`/api/tasks/${t.id}`, {
+    const res = await fetch(`/api/tasks/${t.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ done: !t.done }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      setTasks(previous);
+      setError(data.error || "Could not update task.");
+      return;
+    }
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? data.task : x)));
+    setError(null);
   };
 
   const remove = async (t: Task) => {
+    const previous = tasks;
     setTasks((prev) => prev.filter((x) => x.id !== t.id));
-    await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      setTasks(previous);
+      setError(data.error || "Could not delete task.");
+      return;
+    }
+    setError(null);
   };
 
   const togglePin = async (t: Task) => {
     const next = !t.pinned;
+    const previous = tasks;
     setTasks((prev) =>
       prev.map((x) => (x.id === t.id ? { ...x, pinned: next } : x))
     );
-    await fetch(`/api/tasks/${t.id}`, {
+    const res = await fetch(`/api/tasks/${t.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned: next }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      setTasks(previous);
+      setError(data.error || "Could not update task.");
+      return;
+    }
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? data.task : x)));
+    setError(null);
   };
 
   const startEdit = (t: Task) => {
@@ -83,14 +122,23 @@ export default function Tasks() {
     const trimmed = editTitle.trim();
     setEditingId(null);
     if (!trimmed || trimmed === t.title) return;
+    const previous = tasks;
     setTasks((prev) =>
       prev.map((x) => (x.id === t.id ? { ...x, title: trimmed } : x))
     );
-    await fetch(`/api/tasks/${t.id}`, {
+    const res = await fetch(`/api/tasks/${t.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: trimmed }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      setTasks(previous);
+      setError(data.error || "Could not rename task.");
+      return;
+    }
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? data.task : x)));
+    setError(null);
   };
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
@@ -124,6 +172,7 @@ export default function Tasks() {
     const offset = isPinned ? PINNED_SORT_OFFSET : PENDING_SORT_OFFSET;
 
     // Merge reordered group back into full task list preserving other groups
+    const previous = tasks;
     setTasks((prev) => {
       const groupIds = new Set(group.map((t) => t.id));
       const rest = prev.filter((t) => !groupIds.has(t.id));
@@ -132,11 +181,19 @@ export default function Tasks() {
     });
 
     // Persist new order
-    await fetch("/api/tasks", {
+    const res = await fetch("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: reordered.map((t) => t.id), pinned: isPinned }),
     });
+    if (!res.ok) {
+      const data = await res.json();
+      setTasks(previous);
+      setError(data.error || "Could not reorder tasks.");
+      return;
+    }
+    setError(null);
+    await loadTasks();
   };
 
   // ── Derived groups ─────────────────────────────────────────────────────────
@@ -353,6 +410,8 @@ export default function Tasks() {
           </div>
         )}
 
+        {error && <div className="info-box" style={{ marginBottom: 16 }}>{error}</div>}
+
         {/* Pinned section */}
         {pinned.length > 0 && (
           <>
@@ -424,4 +483,3 @@ export default function Tasks() {
     </>
   );
 }
-

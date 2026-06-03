@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { getCurrentAccount, refreshSession } from "@/lib/auth";
 import { ok, err } from "@/lib/api";
+import { ensureTasksSchema } from "@/lib/tasks-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export async function PUT(req: NextRequest, { params }: Params) {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
+  await ensureTasksSchema();
 
   const { id } = await params;
   if (!UUID_RE.test(id)) return err("Invalid task id", 400);
@@ -44,6 +46,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
+  await ensureTasksSchema();
 
   const { id } = await params;
   if (!UUID_RE.test(id)) return err("Invalid task id", 400);
