@@ -153,13 +153,13 @@ export default function Tasks() {
 
   // ── Task row renderer ──────────────────────────────────────────────────────
 
-  const renderTask = (t: Task, draggable: boolean, group: Task[]) => (
+  const renderTask = (t: Task, draggable: boolean, group: Task[], isGroupPinned: boolean) => (
     <div
       key={t.id}
       draggable={draggable && editingId !== t.id}
       onDragStart={() => handleDragStart(t.id)}
       onDragOver={(e) => handleDragOver(e, t.id)}
-      onDrop={() => handleDrop(group, group[0]?.pinned ?? false)}
+      onDrop={() => handleDrop(group, isGroupPinned)}
       className="card tap"
       style={{
         display: "flex",
@@ -367,7 +367,7 @@ export default function Tasks() {
               📌 Pinned
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-              {pinned.map((t) => renderTask(t, true, pinned))}
+              {pinned.map((t) => renderTask(t, true, pinned, true))}
             </div>
           </>
         )}
@@ -391,7 +391,7 @@ export default function Tasks() {
               </div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-              {pending.map((t) => renderTask(t, true, pending))}
+              {pending.map((t) => renderTask(t, true, pending, false))}
             </div>
           </>
         )}
@@ -413,7 +413,7 @@ export default function Tasks() {
               ✓ Done ({done.length})
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {done.map((t) => renderTask(t, false, done))}
+              {done.map((t) => renderTask(t, false, done, false))}
             </div>
           </>
         )}

@@ -84,15 +84,14 @@ export async function PATCH(req: NextRequest) {
   const isPinned = body.pinned === true;
   const offset = isPinned ? 0 : 10000;
 
-  await Promise.all(
-    ids.map((id, index) =>
-      sql`
-        UPDATE tasks
-        SET sort_order = ${offset + index}
-        WHERE id = ${id}::uuid AND account_id = ${account.id}::uuid
-      `
-    )
-  );
+  // Update each task's sort_order in a single atomic query using unnest
+  const sortOrders = ids.map((_, i) => offset + i);
+  await sql`
+    UPDATE tasks
+    SET sort_order = v.ord
+    FROM unnest(${ids}::uuid[], ${sortOrders}::int[]) AS v(id, ord)
+    WHERE tasks.id = v.id AND tasks.account_id = ${account.id}::uuid
+  `;
 
   await refreshSession(account.id);
   return ok({ ok: true });
