@@ -42,6 +42,8 @@ export default function Dashboard() {
 
   // Cached task groups for Today's tasks section
   const pinnedActiveTasks = tasks.filter((t) => t.pinned && !t.done);
+  // Math.max(0, ...) guards against a negative slice bound when there are
+  // more than 3 pinned active tasks, which would otherwise show wrong results.
   const pendingTasks = tasks.filter((t) => !t.pinned && !t.done).slice(0, Math.max(0, 3 - pinnedActiveTasks.length));
   const doneTasks = tasks.filter((t) => t.done);
 

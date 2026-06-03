@@ -104,7 +104,7 @@ export default function Tasks() {
     dragOverId.current = id;
   };
 
-  const handleDrop = async (group: Task[], isGroupPinned: boolean) => {
+  const handleDrop = async (group: Task[], isPinned: boolean) => {
     const fromId = dragId.current;
     const toId = dragOverId.current;
     dragId.current = null;
@@ -121,7 +121,7 @@ export default function Tasks() {
     reordered.splice(toIdx, 0, moved);
 
     // Globally-unique sort_order: pinned group = 0…N, pending group = 10000…
-    const offset = isGroupPinned ? PINNED_SORT_OFFSET : PENDING_SORT_OFFSET;
+    const offset = isPinned ? PINNED_SORT_OFFSET : PENDING_SORT_OFFSET;
 
     // Merge reordered group back into full task list preserving other groups
     setTasks((prev) => {
@@ -135,7 +135,7 @@ export default function Tasks() {
     await fetch("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: reordered.map((t) => t.id), pinned: isGroupPinned }),
+      body: JSON.stringify({ ids: reordered.map((t) => t.id), pinned: isPinned }),
     });
   };
 
@@ -154,13 +154,13 @@ export default function Tasks() {
 
   // ── Task row renderer ──────────────────────────────────────────────────────
 
-  const renderTask = (t: Task, draggable: boolean, group: Task[], isGroupPinned: boolean) => (
+  const renderTask = (t: Task, draggable: boolean, group: Task[], isPinned: boolean) => (
     <div
       key={t.id}
       draggable={draggable && editingId !== t.id}
       onDragStart={() => handleDragStart(t.id)}
       onDragOver={(e) => handleDragOver(e, t.id)}
-      onDrop={() => handleDrop(group, isGroupPinned)}
+      onDrop={() => handleDrop(group, isPinned)}
       className="card tap"
       style={{
         display: "flex",

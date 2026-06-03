@@ -85,7 +85,8 @@ export async function PATCH(req: NextRequest) {
   const isPinned = body.pinned === true;
   const offset = isPinned ? PINNED_SORT_OFFSET : PENDING_SORT_OFFSET;
 
-  // Update all sort_order values atomically in a single query
+  // Assign sequential sort_order values starting from the group offset.
+  // Each reorder overwrites previous values, so no gaps accumulate between calls.
   const sortOrders = Array.from({ length: ids.length }, (_, i) => offset + i);
   await sql`
     UPDATE tasks
