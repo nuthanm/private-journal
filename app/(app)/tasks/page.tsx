@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { PINNED_SORT_OFFSET, PENDING_SORT_OFFSET } from "@/lib/task-constants";
 
 type Task = {
   id: string;
@@ -103,7 +104,7 @@ export default function Tasks() {
     dragOverId.current = id;
   };
 
-  const handleDrop = async (group: Task[], isPinned: boolean) => {
+  const handleDrop = async (group: Task[], isGroupPinned: boolean) => {
     const fromId = dragId.current;
     const toId = dragOverId.current;
     dragId.current = null;
@@ -120,7 +121,7 @@ export default function Tasks() {
     reordered.splice(toIdx, 0, moved);
 
     // Globally-unique sort_order: pinned group = 0…N, pending group = 10000…
-    const offset = isPinned ? 0 : 10000;
+    const offset = isGroupPinned ? PINNED_SORT_OFFSET : PENDING_SORT_OFFSET;
 
     // Merge reordered group back into full task list preserving other groups
     setTasks((prev) => {
@@ -134,7 +135,7 @@ export default function Tasks() {
     await fetch("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: reordered.map((t) => t.id), pinned: isPinned }),
+      body: JSON.stringify({ ids: reordered.map((t) => t.id), pinned: isGroupPinned }),
     });
   };
 
@@ -174,6 +175,8 @@ export default function Tasks() {
       {/* Drag handle */}
       {draggable && (
         <span
+          role="img"
+          aria-label="Drag to reorder"
           title="Drag to reorder"
           style={{
             color: "var(--rule)",
@@ -183,7 +186,7 @@ export default function Tasks() {
             userSelect: "none",
           }}
         >
-          ⠿
+          ☰
         </span>
       )}
 

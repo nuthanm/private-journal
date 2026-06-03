@@ -42,7 +42,7 @@ export default function Dashboard() {
 
   // Cached task groups for Today's tasks section
   const pinnedActiveTasks = tasks.filter((t) => t.pinned && !t.done);
-  const pendingTasks = tasks.filter((t) => !t.pinned && !t.done).slice(0, 3 - pinnedActiveTasks.length);
+  const pendingTasks = tasks.filter((t) => !t.pinned && !t.done).slice(0, Math.max(0, 3 - pinnedActiveTasks.length));
   const doneTasks = tasks.filter((t) => t.done);
 
   return (

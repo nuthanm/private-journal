@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { getCurrentAccount, refreshSession } from "@/lib/auth";
 import { ok, err } from "@/lib/api";
+import { PINNED_SORT_OFFSET, PENDING_SORT_OFFSET } from "@/lib/task-constants";
 
 export const dynamic = "force-dynamic";
 
@@ -82,10 +83,10 @@ export async function PATCH(req: NextRequest) {
 
   // pinned flag tells us which group: pinned tasks offset by 0, pending by 10000
   const isPinned = body.pinned === true;
-  const offset = isPinned ? 0 : 10000;
+  const offset = isPinned ? PINNED_SORT_OFFSET : PENDING_SORT_OFFSET;
 
-  // Update each task's sort_order in a single atomic query using unnest
-  const sortOrders = ids.map((_, i) => offset + i);
+  // Update all sort_order values atomically in a single query
+  const sortOrders = Array.from({ length: ids.length }, (_, i) => offset + i);
   await sql`
     UPDATE tasks
     SET sort_order = v.ord
