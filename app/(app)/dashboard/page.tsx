@@ -40,6 +40,11 @@ export default function Dashboard() {
     0
   );
 
+  // Cached task groups for Today's tasks section
+  const pinnedActiveTasks = tasks.filter((t) => t.pinned && !t.done);
+  const pendingTasks = tasks.filter((t) => !t.pinned && !t.done).slice(0, Math.max(0, 3 - pinnedActiveTasks.length));
+  const doneTasks = tasks.filter((t) => t.done);
+
   return (
     <>
       <TopNav back={null} crumb="Dashboard" rightHref="/settings" rightLabel="☰" />
@@ -130,9 +135,7 @@ export default function Dashboard() {
             </div>
           )}
           {/* Pinned tasks always shown first */}
-          {tasks
-            .filter((t) => t.pinned && !t.done)
-            .map((t) => (
+          {pinnedActiveTasks.map((t) => (
               <div key={t.id} className="recent-item">
                 <div style={{ color: "var(--gold)", fontSize: 13, flexShrink: 0 }}>📌</div>
                 <div className="info">
@@ -141,10 +144,7 @@ export default function Dashboard() {
               </div>
             ))}
           {/* Non-pinned pending tasks (up to 3 total shown) */}
-          {tasks
-            .filter((t) => !t.pinned && !t.done)
-            .slice(0, Math.max(0, 3 - tasks.filter((t) => t.pinned && !t.done).length))
-            .map((t) => (
+          {pendingTasks.map((t) => (
               <div key={t.id} className="recent-item">
                 <div className="dot draft" />
                 <div className="info">
@@ -153,13 +153,13 @@ export default function Dashboard() {
               </div>
             ))}
           {/* Done tasks count */}
-          {tasks.filter((t) => t.done).length > 0 && (
+          {doneTasks.length > 0 && (
             <div className="recent-item" style={{ opacity: 0.6 }}>
               <div className="dot published" />
               <div className="info">
                 <h5 style={{ color: "var(--muted)" }}>
-                  {tasks.filter((t) => t.done).length} task
-                  {tasks.filter((t) => t.done).length === 1 ? "" : "s"} completed
+                  {doneTasks.length} task
+                  {doneTasks.length === 1 ? "" : "s"} completed
                 </h5>
               </div>
             </div>

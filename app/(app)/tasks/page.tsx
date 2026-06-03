@@ -103,7 +103,7 @@ export default function Tasks() {
     dragOverId.current = id;
   };
 
-  const handleDrop = async (group: Task[]) => {
+  const handleDrop = async (group: Task[], isPinned: boolean) => {
     const fromId = dragId.current;
     const toId = dragOverId.current;
     dragId.current = null;
@@ -119,20 +119,22 @@ export default function Tasks() {
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
 
+    // Globally-unique sort_order: pinned group = 0…N, pending group = 10000…
+    const offset = isPinned ? 0 : 10000;
+
     // Merge reordered group back into full task list preserving other groups
     setTasks((prev) => {
       const groupIds = new Set(group.map((t) => t.id));
       const rest = prev.filter((t) => !groupIds.has(t.id));
-      // Reassign sort_order based on new position
-      const updated = reordered.map((t, i) => ({ ...t, sort_order: i }));
+      const updated = reordered.map((t, i) => ({ ...t, sort_order: offset + i }));
       return [...updated, ...rest];
     });
 
-    // Persist new order for the full pending (non-done, non-pinned) list
+    // Persist new order
     await fetch("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: reordered.map((t) => t.id) }),
+      body: JSON.stringify({ ids: reordered.map((t) => t.id), pinned: isPinned }),
     });
   };
 
@@ -157,7 +159,7 @@ export default function Tasks() {
       draggable={draggable && editingId !== t.id}
       onDragStart={() => handleDragStart(t.id)}
       onDragOver={(e) => handleDragOver(e, t.id)}
-      onDrop={() => handleDrop(group)}
+      onDrop={() => handleDrop(group, group[0]?.pinned ?? false)}
       className="card tap"
       style={{
         display: "flex",

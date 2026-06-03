@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest) {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
 
-  let body: { ids?: string[] };
+  let body: { ids?: string[]; pinned?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -72,12 +72,23 @@ export async function PATCH(req: NextRequest) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (ids.some((id) => !UUID_RE.test(id))) return err("Invalid task id in list.", 400);
 
-  // Update each task's sort_order based on its position in the ids array
+  // Verify all IDs belong to this account before modifying anything
+  const owned = (await sql`
+    SELECT id FROM tasks
+    WHERE id = ANY(${ids}::uuid[]) AND account_id = ${account.id}::uuid
+  `) as { id: string }[];
+
+  if (owned.length !== ids.length) return err("One or more task IDs not found.", 404);
+
+  // pinned flag tells us which group: pinned tasks offset by 0, pending by 10000
+  const isPinned = body.pinned === true;
+  const offset = isPinned ? 0 : 10000;
+
   await Promise.all(
     ids.map((id, index) =>
       sql`
         UPDATE tasks
-        SET sort_order = ${index}
+        SET sort_order = ${offset + index}
         WHERE id = ${id}::uuid AND account_id = ${account.id}::uuid
       `
     )
