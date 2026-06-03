@@ -193,7 +193,6 @@ export default function Tasks() {
       return;
     }
     setError(null);
-    await loadTasks();
   };
 
   // ── Derived groups ─────────────────────────────────────────────────────────
@@ -384,6 +383,8 @@ export default function Tasks() {
             : `${remaining} thing${remaining === 1 ? "" : "s"} left. Keep it small. Keep it kind.`}
         </p>
 
+        {error && <div className="info-box" style={{ marginBottom: 16 }}>{error}</div>}
+
         {/* Add task input */}
         <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
           <input
@@ -409,8 +410,6 @@ export default function Tasks() {
             No tasks yet. Add one above and hit Enter.
           </div>
         )}
-
-        {error && <div className="info-box" style={{ marginBottom: 16 }}>{error}</div>}
 
         {/* Pinned section */}
         {pinned.length > 0 && (
