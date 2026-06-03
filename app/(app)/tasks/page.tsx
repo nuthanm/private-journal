@@ -383,7 +383,7 @@ export default function Tasks() {
             : `${remaining} thing${remaining === 1 ? "" : "s"} left. Keep it small. Keep it kind.`}
         </p>
 
-        {error && <div className="info-box" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <div className="info-box" role="alert" style={{ marginBottom: 16 }}>{error}</div>}
 
         {/* Add task input */}
         <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
