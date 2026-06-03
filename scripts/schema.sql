@@ -65,8 +65,14 @@ CREATE TABLE IF NOT EXISTS tasks (
   account_id  UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   title       TEXT NOT NULL,
   done        BOOLEAN NOT NULL DEFAULT false,
+  pinned      BOOLEAN NOT NULL DEFAULT false,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Migration: add columns if upgrading from an older schema
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pinned     BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS tasks_account_idx ON tasks(account_id, created_at DESC);
 

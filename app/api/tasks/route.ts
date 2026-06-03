@@ -5,17 +5,24 @@ import { ok, err } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-type Task = { id: string; title: string; done: boolean; created_at: string };
+type Task = {
+  id: string;
+  title: string;
+  done: boolean;
+  pinned: boolean;
+  sort_order: number;
+  created_at: string;
+};
 
 export async function GET() {
   const account = await getCurrentAccount();
   if (!account) return err("Not authenticated", 401);
 
   const rows = (await sql`
-    SELECT id, title, done, created_at
+    SELECT id, title, done, pinned, sort_order, created_at
     FROM tasks
     WHERE account_id = ${account.id}::uuid
-    ORDER BY done ASC, created_at DESC
+    ORDER BY pinned DESC, done ASC, sort_order ASC, created_at DESC
     LIMIT 200
   `) as Task[];
 
@@ -40,9 +47,42 @@ export async function POST(req: NextRequest) {
   const rows = (await sql`
     INSERT INTO tasks (account_id, title)
     VALUES (${account.id}::uuid, ${title})
-    RETURNING id, title, done, created_at
+    RETURNING id, title, done, pinned, sort_order, created_at
   `) as Task[];
 
   await refreshSession(account.id);
   return ok({ task: rows[0] }, 201);
+}
+
+// PATCH /api/tasks — bulk reorder: accepts { ids: string[] } and sets sort_order
+export async function PATCH(req: NextRequest) {
+  const account = await getCurrentAccount();
+  if (!account) return err("Not authenticated", 401);
+
+  let body: { ids?: string[] };
+  try {
+    body = await req.json();
+  } catch {
+    return err("Invalid request body.", 400);
+  }
+
+  const ids = body.ids;
+  if (!Array.isArray(ids) || ids.length === 0) return err("ids array is required.", 400);
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (ids.some((id) => !UUID_RE.test(id))) return err("Invalid task id in list.", 400);
+
+  // Update each task's sort_order based on its position in the ids array
+  await Promise.all(
+    ids.map((id, index) =>
+      sql`
+        UPDATE tasks
+        SET sort_order = ${index}
+        WHERE id = ${id}::uuid AND account_id = ${account.id}::uuid
+      `
+    )
+  );
+
+  await refreshSession(account.id);
+  return ok({ ok: true });
 }

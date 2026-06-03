@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import TopNav from "@/components/TopNav";
 
-type Task = { id: string; title: string; done: boolean };
+type Task = {
+  id: string;
+  title: string;
+  done: boolean;
+  pinned: boolean;
+  sort_order: number;
+};
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -12,6 +18,10 @@ export default function Tasks() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag state
+  const dragId = useRef<string | null>(null);
+  const dragOverId = useRef<string | null>(null);
 
   useEffect(() => {
     fetch("/api/tasks")
@@ -29,13 +39,12 @@ export default function Tasks() {
     });
     if (res.ok) {
       const data = await res.json();
-      setTasks([data.task, ...tasks]);
+      setTasks((prev) => [data.task, ...prev]);
       setNewTitle("");
     }
   };
 
   const toggle = async (t: Task) => {
-    // Optimistic
     setTasks((prev) =>
       prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x))
     );
@@ -49,6 +58,18 @@ export default function Tasks() {
   const remove = async (t: Task) => {
     setTasks((prev) => prev.filter((x) => x.id !== t.id));
     await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
+  };
+
+  const togglePin = async (t: Task) => {
+    const next = !t.pinned;
+    setTasks((prev) =>
+      prev.map((x) => (x.id === t.id ? { ...x, pinned: next } : x))
+    );
+    await fetch(`/api/tasks/${t.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: next }),
+    });
   };
 
   const startEdit = (t: Task) => {
@@ -71,12 +92,203 @@ export default function Tasks() {
     });
   };
 
-  const remaining = tasks.filter((t) => !t.done).length;
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+
+  const handleDragStart = (id: string) => {
+    dragId.current = id;
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    dragOverId.current = id;
+  };
+
+  const handleDrop = async (group: Task[]) => {
+    const fromId = dragId.current;
+    const toId = dragOverId.current;
+    dragId.current = null;
+    dragOverId.current = null;
+    if (!fromId || !toId || fromId === toId) return;
+
+    // Reorder within this group
+    const fromIdx = group.findIndex((t) => t.id === fromId);
+    const toIdx = group.findIndex((t) => t.id === toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const reordered = [...group];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+
+    // Merge reordered group back into full task list preserving other groups
+    setTasks((prev) => {
+      const groupIds = new Set(group.map((t) => t.id));
+      const rest = prev.filter((t) => !groupIds.has(t.id));
+      // Reassign sort_order based on new position
+      const updated = reordered.map((t, i) => ({ ...t, sort_order: i }));
+      return [...updated, ...rest];
+    });
+
+    // Persist new order for the full pending (non-done, non-pinned) list
+    await fetch("/api/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: reordered.map((t) => t.id) }),
+    });
+  };
+
+  // ── Derived groups ─────────────────────────────────────────────────────────
+
+  const pinned = tasks.filter((t) => t.pinned && !t.done);
+  const pending = tasks.filter((t) => !t.pinned && !t.done);
+  const done = tasks.filter((t) => t.done);
+
+  const remaining = pending.length + pinned.length;
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
   });
+
+  // ── Task row renderer ──────────────────────────────────────────────────────
+
+  const renderTask = (t: Task, draggable: boolean, group: Task[]) => (
+    <div
+      key={t.id}
+      draggable={draggable && editingId !== t.id}
+      onDragStart={() => handleDragStart(t.id)}
+      onDragOver={(e) => handleDragOver(e, t.id)}
+      onDrop={() => handleDrop(group)}
+      className="card tap"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: 14,
+        cursor: draggable ? "grab" : "default",
+        borderLeft: t.pinned ? "3px solid var(--gold)" : undefined,
+        opacity: t.done ? 0.65 : 1,
+      }}
+    >
+      {/* Drag handle */}
+      {draggable && (
+        <span
+          title="Drag to reorder"
+          style={{
+            color: "var(--rule)",
+            fontSize: 16,
+            cursor: "grab",
+            flexShrink: 0,
+            userSelect: "none",
+          }}
+        >
+          ⠿
+        </span>
+      )}
+
+      {/* Done toggle */}
+      <div
+        onClick={() => toggle(t)}
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          border: `2px solid ${t.done ? "var(--green)" : "var(--rule)"}`,
+          background: t.done ? "var(--green)" : "transparent",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontSize: 13,
+          flexShrink: 0,
+          cursor: "pointer",
+        }}
+      >
+        {t.done && "✓"}
+      </div>
+
+      {/* Title / edit input */}
+      {editingId === t.id ? (
+        <input
+          ref={editInputRef}
+          className="input"
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          onBlur={() => saveEdit(t)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveEdit(t);
+            if (e.key === "Escape") setEditingId(null);
+          }}
+          style={{ flex: 1, fontSize: 14, padding: "4px 8px" }}
+        />
+      ) : (
+        <div
+          onClick={() => startEdit(t)}
+          style={{
+            fontSize: 14,
+            textDecoration: t.done ? "line-through" : "none",
+            color: t.done ? "var(--muted)" : "var(--ink)",
+            flex: 1,
+            cursor: "pointer",
+          }}
+        >
+          {t.title}
+        </div>
+      )}
+
+      {/* Pin button */}
+      {editingId !== t.id && !t.done && (
+        <button
+          onClick={() => togglePin(t)}
+          title={t.pinned ? "Unpin task" : "Pin task to top"}
+          style={{
+            background: "none",
+            border: "none",
+            color: t.pinned ? "var(--gold)" : "var(--muted-2)",
+            cursor: "pointer",
+            fontSize: 14,
+            lineHeight: 1,
+          }}
+        >
+          📌
+        </button>
+      )}
+
+      {/* Edit button */}
+      {editingId !== t.id && (
+        <button
+          onClick={() => startEdit(t)}
+          title="Edit task"
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--muted-2)",
+            cursor: "pointer",
+            fontSize: 14,
+            lineHeight: 1,
+          }}
+        >
+          ✏
+        </button>
+      )}
+
+      {/* Delete button */}
+      <button
+        onClick={() => remove(t)}
+        title="Delete task"
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--muted-2)",
+          cursor: "pointer",
+          fontSize: 16,
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -110,7 +322,8 @@ export default function Tasks() {
             : `${remaining} thing${remaining === 1 ? "" : "s"} left. Keep it small. Keep it kind.`}
         </p>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        {/* Add task input */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
           <input
             className="input"
             placeholder="Add a task…"
@@ -128,102 +341,82 @@ export default function Tasks() {
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {tasks.length === 0 && !loading && (
-            <div className="info-box">
-              No tasks yet. Add one above and hit Enter.
-            </div>
-          )}
-          {tasks.map((t) => (
+        {/* Empty state */}
+        {tasks.length === 0 && !loading && (
+          <div className="info-box">
+            No tasks yet. Add one above and hit Enter.
+          </div>
+        )}
+
+        {/* Pinned section */}
+        {pinned.length > 0 && (
+          <>
             <div
-              key={t.id}
-              className="card tap"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: 14,
+                fontSize: 10,
+                fontFamily: "JetBrains Mono, monospace",
+                fontWeight: 600,
+                color: "var(--gold)",
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+                marginBottom: 8,
               }}
             >
-              <div
-                onClick={() => toggle(t)}
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: "50%",
-                  border: `2px solid ${t.done ? "var(--green)" : "var(--rule)"}`,
-                  background: t.done ? "var(--green)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontSize: 13,
-                  flexShrink: 0,
-                  cursor: "pointer",
-                }}
-              >
-                {t.done && "✓"}
-              </div>
-              {editingId === t.id ? (
-                <input
-                  ref={editInputRef}
-                  className="input"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onBlur={() => saveEdit(t)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveEdit(t);
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  style={{ flex: 1, fontSize: 14, padding: "4px 8px" }}
-                />
-              ) : (
-                <div
-                  onClick={() => startEdit(t)}
-                  style={{
-                    fontSize: 14,
-                    textDecoration: t.done ? "line-through" : "none",
-                    color: t.done ? "var(--muted)" : "var(--ink)",
-                    flex: 1,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t.title}
-                </div>
-              )}
-              {editingId !== t.id && (
-                <button
-                  onClick={() => startEdit(t)}
-                  title="Edit task"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--muted-2)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    lineHeight: 1,
-                  }}
-                >
-                  ✏
-                </button>
-              )}
-              <button
-                onClick={() => remove(t)}
-                title="Delete task"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--muted-2)",
-                  cursor: "pointer",
-                  fontSize: 16,
-                }}
-              >
-                ×
-              </button>
+              📌 Pinned
             </div>
-          ))}
-        </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {pinned.map((t) => renderTask(t, true, pinned))}
+            </div>
+          </>
+        )}
+
+        {/* Pending section */}
+        {pending.length > 0 && (
+          <>
+            {pinned.length > 0 && (
+              <div
+                style={{
+                  fontSize: 10,
+                  fontFamily: "JetBrains Mono, monospace",
+                  fontWeight: 600,
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.2em",
+                  marginBottom: 8,
+                }}
+              >
+                To do
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {pending.map((t) => renderTask(t, true, pending))}
+            </div>
+          </>
+        )}
+
+        {/* Done section */}
+        {done.length > 0 && (
+          <>
+            <div
+              style={{
+                fontSize: 10,
+                fontFamily: "JetBrains Mono, monospace",
+                fontWeight: 600,
+                color: "var(--green)",
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+                marginBottom: 8,
+              }}
+            >
+              ✓ Done ({done.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {done.map((t) => renderTask(t, false, done))}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
 }
+
