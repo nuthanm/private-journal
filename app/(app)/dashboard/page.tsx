@@ -6,7 +6,7 @@ import TopNav from "@/components/TopNav";
 import { useSessionTimer } from "@/components/SessionGuard";
 
 type Entry = { id: string; title: string; visibility: string; updated_at: string };
-type Task = { id: string; title: string; done: boolean };
+type Task = { id: string; title: string; done: boolean; pinned: boolean };
 
 export default function Dashboard() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -39,6 +39,13 @@ export default function Dashboard() {
     (acc, e) => acc + ((e as Entry & { body?: string }).body?.split(/\s+/).filter(Boolean).length || 0),
     0
   );
+
+  // Cached task groups for Today's tasks section
+  const pinnedActiveTasks = tasks.filter((t) => t.pinned && !t.done);
+  // Math.max(0, ...) guards against a negative slice bound when there are
+  // more than 3 pinned active tasks, which would otherwise show wrong results.
+  const pendingTasks = tasks.filter((t) => !t.pinned && !t.done).slice(0, Math.max(0, 3 - pinnedActiveTasks.length));
+  const doneTasks = tasks.filter((t) => t.done);
 
   return (
     <>
@@ -129,21 +136,36 @@ export default function Dashboard() {
               No tasks today. Open <b>Daily tasks</b> to add some.
             </div>
           )}
-          {tasks.slice(0, 3).map((t) => (
-            <div key={t.id} className="recent-item">
-              <div className={`dot ${t.done ? "published" : "draft"}`} />
+          {/* Pinned tasks always shown first */}
+          {pinnedActiveTasks.map((t) => (
+              <div key={t.id} className="recent-item">
+                <div style={{ color: "var(--gold)", fontSize: 13, flexShrink: 0 }}>📌</div>
+                <div className="info">
+                  <h5 style={{ color: "var(--ink)" }}>{t.title}</h5>
+                </div>
+              </div>
+            ))}
+          {/* Non-pinned pending tasks (up to 3 total shown) */}
+          {pendingTasks.map((t) => (
+              <div key={t.id} className="recent-item">
+                <div className="dot draft" />
+                <div className="info">
+                  <h5 style={{ color: "var(--ink)" }}>{t.title}</h5>
+                </div>
+              </div>
+            ))}
+          {/* Done tasks count */}
+          {doneTasks.length > 0 && (
+            <div className="recent-item" style={{ opacity: 0.6 }}>
+              <div className="dot published" />
               <div className="info">
-                <h5
-                  style={{
-                    textDecoration: t.done ? "line-through" : "none",
-                    color: t.done ? "var(--muted)" : "var(--ink)",
-                  }}
-                >
-                  {t.title}
+                <h5 style={{ color: "var(--muted)" }}>
+                  {doneTasks.length} task
+                  {doneTasks.length === 1 ? "" : "s"} completed
                 </h5>
               </div>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </>
