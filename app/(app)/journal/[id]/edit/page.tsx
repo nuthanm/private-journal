@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import TopNav from "@/components/TopNav";
 
 export default function Editor() {
   const params = useParams<{ id: string }>();
